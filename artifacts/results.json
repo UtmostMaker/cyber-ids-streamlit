@@ -1,34 +1,34 @@
 {
   "random_forest": {
-    "accuracy": 1.0,
-    "f1": 1.0,
-    "auc_roc": 1.0,
+    "accuracy": 0.979,
+    "f1": 0.9780564263322884,
+    "auc_roc": 0.9970211986107941,
     "confusion_matrix": [
       [
-        450,
-        0
+        1022,
+        16
       ],
       [
-        0,
-        150
+        26,
+        936
       ]
     ]
   },
   "xgboost": {
-    "accuracy": 1.0,
-    "f1": 1.0,
-    "auc_roc": 1.0,
+    "accuracy": 0.9845,
+    "f1": 0.9838961038961039,
+    "auc_roc": 0.9985914660770152,
     "confusion_matrix": [
       [
-        450,
-        0
+        1022,
+        16
       ],
       [
-        0,
-        150
+        15,
+        947
       ]
     ]
   },
-  "best_model": "random_forest",
-  "best_f1": 1.0
+  "best_model": "xgboost",
+  "best_f1": 0.9838961038961039
 }

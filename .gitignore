@@ -1,7 +1,6 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 .Python
 *.egg-info/
@@ -10,30 +9,38 @@ build/
 eggs/
 *.egg
 
-# Virtual environment
+# Virtual env
 .venv/
 venv/
 ENV/
-env/
 
 # Streamlit
 .streamlit/
+.streamlit.secrets
+.streamlit.toml
 
-# Modeles et donnees (ne pas pousser sur GitHub)
+# Artefacts modeles
 models/*.pkl
 artifacts/*.pkl
-artifacts/*.csv
-data/*.csv
+artifacts/*.joblib
+
+# Data (garder le CSV dans git, pas les .txt originaux)
+data/KDDTrain+.txt
+data/KDDTest+.txt
 
 # Logs
 logs/*.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.pem
+*.key
