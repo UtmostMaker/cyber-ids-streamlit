@@ -6,14 +6,42 @@ Systeme de Detection d'Intrusion (IDS) base sur Machine Learning avec dashboard 
 
 Application web permettant de detecter des intrusions reseau en temps reel grace a des modeles Random Forest et XGBoost entranes sur le dataset NSL-KDD. Elle propose un dashboard 4 pages avec comparaison de modeles, simulation temps reel, test manuel et capture reseau live.
 
-## Dataset
+## Datasets
 
-**NSL-KDD** (National Library of Knowledge Discovery)
+Ce projet utilise **NSL-KDD** par defaut (preparation automatique au premier lancement).
+Plusieurs autres datasets sont compatibles avec le meme preprocessing.
+
+### NSL-KDD (actuel — default)
 - Source : https://www.unb.ca/cic/datasets/nslkdd.html
-- 125 973 sessions d'entrainement, 22 544 de test
+- 125 973 sessions entrainement, 22 544 test
 - 22 types d'attaques (Neptune, Smurf, Pod, Teardrop, etc.)
-- Cible : `binary_label` (0 = normal, 1 = attaque)
-- Features : duration, protocol_type, service, src_bytes, dst_bytes, serror_rate, etc.
+-Avantage : well-structured, facile a traiter
+- Limite : dataset academique de 2009, moins representative du trafic actuel
+
+### CICIDS2017 (recommande pour production)
+- Source : https://www.unb.ca/cic/datasets/ids2017.html
+- ~2.5M sessions labellisees sur 5 jours (lundi-vendredi)
+- 14 types d'attaques : Brute Force FTP, Brute Force SSH, DoS, Web Attacks, Infiltration, Botnet, etc.
+- Contient des captures PCAP et des logs CSV
+- Compatible : colonnes similaires a NSL-KDD (src_bytes, dst_bytes, duration, flags, protocol_type, etc.)
+- Installation : tlcharger les CSV depuis https://www.unb.ca/cic/datasets/ids2017.html et placer dans data/
+
+### CSE-CIC-IDS2018 (complet mais volumineux)
+- Source : https://www.unb.ca/cic/datasets/cse-cic-ids2018.html
+- ~16M de sessions sur 10 jours avec 10 sous-réseaux simulates
+- Attaques : Brute Force, DoS, Web Attacks, Infiltration, Bot, Ransomware
+- Necessite preprocessing avance (agrégation de flux)
+- Ideal pour tests de performanceAdvance
+
+### BoT-IoT (IoT)
+- Source : https://research.unsw.edu.au/projects/bot-iot-dataset
+- Trafic IoT (thermostats, detecteurs, cameras) avec attaques (DoS, DDoS, Data exfiltration)
+- Pour tester la detection dans un contexte IoT/Cloud
+
+### TON_IoT (heterogene)
+- Source : https://research.unsw.edu.au/projects/ton-iot-dataset
+- Melange de donnees IT, IoT et IIoT (Supervision Industrielle)
+- Contient aussi des donnees de telemetrie et de nuages
 
 ## Stack technique
 
@@ -267,15 +295,15 @@ Meilleur modele : **XGBoost**
 ## Limitations et ameliorations
 
 **Limites actuelles :**
-- Dataset NSL-KDD date de 2009 (reseau academique, moins representative du trafic actuel)
+- NSL-KDD date de 2009 (academique) : les performances rapportees sont meilleures que ce qu'on oberve sur trafic reel
 - Simulation temps reel basee sur des distributions statistiques, pas du vrai trafic
 - Seuil d'alerte fixe (non adaptatif)
+- Pas de detection sur trafic chiffre (HTTPS, SSH) en mode live (seuls les metadonnees sont utilisees)
 
-**Ameliorations possibles :**
-- CICIDS2017 ou CSE-CIC-IDS2018 pour un dataset plus recent
-- Integration Scapy/Zeek en production pour le mode live
+**Ameliorations recommandees :**
+- CICIDS2017 ou CSE-CIC-IDS2018 pour des metriques realistes (voir section Dataset)
 - Retraining automatique sur nouveau trafic labelise
-- Alerting (webhook, email, Slack) lors d'attaques
+- Alerting (webhook, email, Slack) lors d'attaques detectees
 - Interface multi-utilisateurs avec historique
 - Export PDF du rapport d'analyse
 
