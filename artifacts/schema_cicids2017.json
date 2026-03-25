@@ -1,0 +1,75 @@
+{
+  "dataset": "CICIDS2017 (synthetique, base sur Sharafaldin et al. 2018)",
+  "source": "HuggingFace: Lama3311/CICIDS2017 (non telechargeable, genere synthetique)",
+  "n_samples": 15000,
+  "n_features": 20,
+  "feature_names": [
+    "duration",
+    "fwd_packets",
+    "bwd_packets",
+    "fwd_len",
+    "bwd_len",
+    "flow_bytes_s",
+    "flow_packets_s",
+    "fwd_iat_mean",
+    "bwd_iat_mean",
+    "fwd_psh_flags",
+    "syn_count",
+    "rst_count",
+    "ack_count",
+    "psh_count",
+    "active_mean",
+    "idle_mean",
+    "flow_iat_mean",
+    "fwd_len_mean",
+    "bwd_len_mean",
+    "dst_port"
+  ],
+  "feature_names_cicids2017": [
+    "duration",
+    "fwd_packets",
+    "bwd_packets",
+    "fwd_len",
+    "bwd_len",
+    "flow_bytes_s",
+    "flow_packets_s",
+    "fwd_iat_mean",
+    "bwd_iat_mean",
+    "fwd_psh_flags",
+    "syn_count",
+    "rst_count",
+    "ack_count",
+    "psh_count",
+    "active_mean",
+    "idle_mean",
+    "flow_iat_mean",
+    "fwd_len_mean",
+    "bwd_len_mean",
+    "dst_port"
+  ],
+  "target": "label",
+  "target_classes": {
+    "0": "Benign",
+    "1": "Attack"
+  },
+  "attack_types": [
+    "PortScan",
+    "Benign",
+    "DoS",
+    "Infiltration",
+    "BruteForce"
+  ],
+  "train_size": 12000,
+  "test_size": 3000,
+  "class_distribution": {
+    "Benign": 9000,
+    "Attack": 6000,
+    "by_type": {
+      "Benign": 9000,
+      "DoS": 2400,
+      "PortScan": 1500,
+      "BruteForce": 1200,
+      "Infiltration": 900
+    }
+  }
+}

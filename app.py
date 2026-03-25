@@ -2,6 +2,7 @@
 """
 Cyber IDS - Dashboard Streamlit
 Application d'analyse d'intrusion en temps reel avec ML.
+Support multi-dataset: NSL-KDD et CICIDS2017.
 """
 import os, sys, json, pickle
 import streamlit as st
@@ -17,36 +18,51 @@ ARTIFACTS = os.path.join(BASE, "artifacts")
 MODELS = os.path.join(BASE, "models")
 DATA = os.path.join(BASE, "data")
 
-# ── Chargement des artefacts ─────────────────────────────────────────────────
+# ── Chargement des artefacts (avec cache) ─────────────────────────────────────
 @st.cache_data
-def load_results():
-    with open(os.path.join(ARTIFACTS, "results.json")) as f:
+def load_results(dataset):
+    if dataset == "cicids2017":
+        path = os.path.join(ARTIFACTS, "results_cicids2017.json")
+    else:
+        path = os.path.join(ARTIFACTS, "results.json")
+    with open(path) as f:
         return json.load(f)
 
 @st.cache_data
-def load_feature_importance():
+def load_feature_importance(dataset):
+    if dataset == "cicids2017":
+        return pd.read_csv(os.path.join(ARTIFACTS, "feature_importance_cicids2017.csv"))
     return pd.read_csv(os.path.join(ARTIFACTS, "feature_importance.csv"))
 
 @st.cache_data
-def load_schema():
-    with open(os.path.join(ARTIFACTS, "schema.json")) as f:
+def load_schema(dataset):
+    if dataset == "cicids2017":
+        path = os.path.join(ARTIFACTS, "schema_cicids2017.json")
+    else:
+        path = os.path.join(ARTIFACTS, "schema.json")
+    with open(path) as f:
         return json.load(f)
 
 @st.cache_data
-def load_model():
-    with open(os.path.join(MODELS, "model.pkl"), "rb") as f:
-        return pickle.load(f)
-
-@st.cache_data
-def load_preprocessor():
-    with open(os.path.join(ARTIFACTS, "preprocessor.pkl"), "rb") as f:
-        return pickle.load(f)
-
-@st.cache_resource
-def load_explain_module():
-    sys.path.insert(0, BASE)
-    import explain
-    return explain
+def load_model_and_preprocessor(dataset):
+    if dataset == "cicids2017":
+        model_path = os.path.join(MODELS, "model_cicids2017.pkl")
+        preproc_path = os.path.join(ARTIFACTS, "preprocessor_cicids2017.pkl")
+        le_path = None
+    else:
+        model_path = os.path.join(MODELS, "model.pkl")
+        preproc_path = os.path.join(ARTIFACTS, "preprocessor.pkl")
+        le_path = os.path.join(ARTIFACTS, "label_encoders.pkl")
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+    with open(preproc_path, "rb") as f:
+        preprocessor = pickle.load(f)
+    if le_path:
+        with open(le_path, "rb") as f:
+            label_encoders = pickle.load(f)
+    else:
+        label_encoders = {}
+    return model, preprocessor, label_encoders
 
 # ── Config theme sombre ───────────────────────────────────────────────────────
 st.set_page_config(
@@ -65,6 +81,7 @@ dark_css = """
     .stSelectbox > div > div > div,
     .stNumberInput > div > div > input { background: #161b22; color: #c9d1d9; }
     div[data-testid="stHorizontalBlock"] > div { background: #161b22; border-radius: 8px; padding: 12px; }
+    .stTabs > div > div { background: #161b22; }
 </style>
 """
 st.markdown(dark_css, unsafe_allow_html=True)
@@ -78,18 +95,35 @@ page = st.sidebar.radio(
     index=0
 )
 
+# ── Dataset selector in sidebar ───────────────────────────────────────────────
+available_datasets = []
+if os.path.exists(os.path.join(ARTIFACTS, "results.json")):
+    available_datasets.append(("NSL-KDD", "nslkdd"))
+if os.path.exists(os.path.join(ARTIFACTS, "results_cicids2017.json")):
+    available_datasets.append(("CICIDS2017", "cicids2017"))
+
+dataset_options = [d[0] for d in available_datasets]
+selected_dataset_label = st.sidebar.selectbox(
+    "Dataset actif",
+    dataset_options,
+    index=0 if dataset_options else 0
+)
+active_dataset = dict(available_datasets).get(selected_dataset_label, "nslkdd")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — Modeles
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "1. Modeles":
     st.title("Comparaison des Modeles")
+    st.caption(f"Dataset actif: {selected_dataset_label}")
 
     try:
-        results = load_results()
-        features = load_feature_importance()
-        schema = load_schema()
+        results = load_results(active_dataset)
+        features = load_feature_importance(active_dataset)
+        schema = load_schema(active_dataset)
     except Exception as e:
-        st.error(f"Erreur de chargement des artefacts: {e}")
+        st.error(f"Erreur de chargement des artefacts ({active_dataset}): {e}")
         st.stop()
 
     rf = results["random_forest"]
@@ -107,6 +141,13 @@ if page == "1. Modeles":
     with col4:
         st.metric("F1 XGB", f"{xgb['f1']*100:.2f}%")
 
+    # ── AUC-ROC ────────────────────────────────────────────────────────────────
+    col_auc1, col_auc2 = st.columns(2)
+    with col_auc1:
+        st.metric("AUC-ROC RF", f"{rf['auc_roc']*100:.2f}%")
+    with col_auc2:
+        st.metric("AUC-ROC XGB", f"{xgb['auc_roc']*100:.2f}%")
+
     st.markdown("---")
 
     # ── Bar chart comparatif ─────────────────────────────────────────────────
@@ -116,7 +157,7 @@ if page == "1. Modeles":
         "Random Forest": [rf["accuracy"], rf["f1"], rf["auc_roc"]],
         "XGBoost": [xgb["accuracy"], xgb["f1"], xgb["auc_roc"]]
     })
-    fig_bar = make_subplots(rows=1, cols=1)
+    fig_bar = go.Figure()
     for col in ["Random Forest", "XGBoost"]:
         fig_bar.add_trace(go.Bar(
             name=col, x=metrics_df["Metrique"],
@@ -165,7 +206,7 @@ if page == "1. Modeles":
     st.markdown("---")
 
     # ── Feature importance ───────────────────────────────────────────────────
-    st.subheader("Importance des Variables (XGBoost)")
+    st.subheader("Importance des Variables (Meilleur Modele)")
     top_n = st.slider("Nombre de features", 5, 20, 10, key="fi_slider")
     top_feat = features.head(top_n)
     fig_fi = px.bar(
@@ -182,18 +223,57 @@ if page == "1. Modeles":
 
     st.markdown("---")
 
-    # ── Dataset info ─────────────────────────────────────────────────────────
+    # ── Schema du dataset ─────────────────────────────────────────────────────
     with st.expander("Schema du dataset"):
         st.json(schema)
+
+    # ── Comparaison des datasets (si les deux sont disponibles) ──────────────
+    if len(available_datasets) > 1:
+        with st.expander("Comparaison NSL-KDD vs CICIDS2017"):
+            st.markdown("### Comparaison des deux datasets")
+            comparison_data = []
+            for label, ds in available_datasets:
+                try:
+                    r = load_results(ds)
+                    comparison_data.append({
+                        "Dataset": label,
+                        "Modele": "XGBoost",
+                        "Accuracy": f"{r['xgboost']['accuracy']*100:.2f}%",
+                        "F1": f"{r['xgboost']['f1']*100:.2f}%",
+                        "AUC-ROC": f"{r['xgboost']['auc_roc']*100:.2f}%"
+                    })
+                except:
+                    pass
+            if comparison_data:
+                st.dataframe(pd.DataFrame(comparison_data), hide_index=True)
+
+                fig_comp = go.Figure()
+                for row in comparison_data:
+                    fig_comp.add_trace(go.Bar(
+                        name=row["Dataset"],
+                        x=["Accuracy", "F1", "AUC-ROC"],
+                        y=[float(row[k].replace("%",""))/100 for k in ["Accuracy","F1","AUC-ROC"]],
+                        text=[row[k] for k in ["Accuracy","F1","AUC-ROC"]],
+                        textposition="outside"
+                    ))
+                fig_comp.update_layout(
+                    barmode="group", template="plotly_dark",
+                    paper_bgcolor="#0d1117", plot_bgcolor="#161b22",
+                    height=350,
+                    legend=dict(bgcolor="#161b22", font=dict(color="#c9d1d9"))
+                )
+                st.plotly_chart(fig_comp, width='stretch')
+            else:
+                st.warning("Impossible de charger les metriques pour la comparaison.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — Simulation RT
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "2. Simulation RT":
     st.title("Simulation Temps Reel")
-    st.caption("Generation de sessions reseau pour demontrer les alertes en temps reel")
+    st.caption(f"Dataset actif: {selected_dataset_label} | Generation de sessions reseau pour tester le systeme IDS")
 
-    # Init state
     if "sim_running" not in st.session_state:
         st.session_state.sim_running = False
     if "sim_counter" not in st.session_state:
@@ -205,17 +285,101 @@ elif page == "2. Simulation RT":
     if "sim_history" not in st.session_state:
         st.session_state.sim_history = []
 
-    # Counter placeholders
     col_a, col_b = st.columns(2)
     counter_placeholder = col_a.empty()
     rate_placeholder = col_b.empty()
-
-    # Session feed
     st.subheader("Sessions en cours")
     feed_placeholder = st.empty()
 
-    def gen_session(idx):
-        """Genere une session aleatoire basee sur les statistiques NSL-KDD."""
+    # Chargement modele et preprocessor
+    try:
+        model, preprocessor, label_encoders = load_model_and_preprocessor(active_dataset)
+    except Exception as e:
+        st.error(f"Impossible de charger le modele {active_dataset}: {e}")
+        st.stop()
+
+    # ── Generateur de sessions selon le dataset ─────────────────────────────
+    def gen_session_cicids2017(idx):
+        """Genere une session basee sur les statistiques CICIDS2017."""
+        import random
+        normal = random.random() > 0.40  # 40% attaques
+        stealth = random.random() > 0.5   # 50% stealth attacks
+        if normal:
+            duration = np.clip(np.random.lognormal(4.5, 2), 0, 10000)
+            fwd_packets = random.poisson(8 if not stealth else 5)
+            bwd_packets = random.poisson(6 if not stealth else 3)
+            fwd_len = int(np.clip(np.random.lognormal(9, 2), 0, 1e8))
+            bwd_len = int(np.clip(np.random.lognormal(10, 2), 0, 1e8))
+            flow_bytes_s = np.clip(np.random.lognormal(12, 2), 0, 1e10)
+            flow_packets_s = np.clip(np.random.lognormal(3, 1.5), 0, 1e5)
+            fwd_iat_mean = np.clip(np.random.lognormal(5, 2), 0, 1e6)
+            bwd_iat_mean = np.clip(np.random.lognormal(6, 2), 0, 1e6)
+            syn_count = random.poisson(2 if not stealth else 5)
+            rst_count = random.poisson(0.5)
+            ack_count = int(np.clip(np.random.lognormal(3, 1), 0, 1e5))
+            psh_count = random.poisson(1)
+            active_mean = np.clip(np.random.lognormal(7, 2), 0, 1e6)
+            idle_mean = np.clip(np.random.lognormal(8, 2), 0, 1e6)
+            flow_iat_mean = np.clip(np.random.lognormal(5.5, 2), 0, 1e6)
+            fwd_len_mean = np.clip(np.random.lognormal(8, 2), 0, 1e6)
+            bwd_len_mean = np.clip(np.random.lognormal(9, 2), 0, 1e6)
+            dst_port = random.choice([80, 443, 22, 53, 8080, 21])
+            is_attack = False
+        else:
+            # Attaques avec 50% stealth
+            duration = np.clip(np.random.lognormal(1 if not stealth else 4, 1.5 if not stealth else 2), 0, 10000)
+            fwd_packets = random.poisson(3 if not stealth else 8)
+            bwd_packets = random.poisson(2 if not stealth else 6)
+            fwd_len = int(np.clip(np.random.lognormal(4 if not stealth else 9, 2), 0, 1e8))
+            bwd_len = int(np.clip(np.random.lognormal(4 if not stealth else 10, 2), 0, 1e8))
+            flow_bytes_s = np.clip(np.random.lognormal(8 if not stealth else 12, 2), 0, 1e10)
+            flow_packets_s = np.clip(np.random.lognormal(5 if not stealth else 3, 2), 0, 1e5)
+            fwd_iat_mean = np.clip(np.random.lognormal(2 if not stealth else 5, 1.5 if not stealth else 2), 0, 1e6)
+            bwd_iat_mean = np.clip(np.random.lognormal(2 if not stealth else 6, 1.5 if not stealth else 2), 0, 1e6)
+            syn_count = random.poisson(8 if not stealth else 2)
+            rst_count = random.poisson(1 if not stealth else 0.5)
+            ack_count = int(np.clip(np.random.lognormal(2 if not stealth else 4, 1), 0, 1e5))
+            psh_count = random.poisson(2 if not stealth else 1)
+            active_mean = np.clip(np.random.lognormal(1 if not stealth else 7, 1 if not stealth else 2), 0, 1e6)
+            idle_mean = np.clip(np.random.lognormal(0.5 if not stealth else 8, 0.5 if not stealth else 2), 0, 1e6)
+            flow_iat_mean = np.clip(np.random.lognormal(1.5 if not stealth else 5.5, 1 if not stealth else 2), 0, 1e6)
+            fwd_len_mean = np.clip(np.random.lognormal(3 if not stealth else 8, 1.5 if not stealth else 2), 0, 1e6)
+            bwd_len_mean = np.clip(np.random.lognormal(3 if not stealth else 9, 1.5 if not stealth else 2), 0, 1e6)
+            dst_port = random.choice([22, 21, 80, 443, 0, 53, 8080])
+            is_attack = True
+
+        fwd_psh_flags = random.poisson(1)
+        return {
+            "session_id": f"SES-{idx:05d}",
+            "src_ip": f"192.168.{random.randint(1,254)}.{random.randint(1,254)}",
+            "dst_ip": f"10.0.{random.randint(1,254)}.{random.randint(1,254)}",
+            "src_port": random.randint(1024, 65535),
+            "dst_port": dst_port,
+            "protocol": "TCP",
+            "duration": round(duration, 2),
+            "fwd_packets": fwd_packets,
+            "bwd_packets": bwd_packets,
+            "fwd_len": fwd_len,
+            "bwd_len": bwd_len,
+            "flow_bytes_s": round(flow_bytes_s, 2),
+            "flow_packets_s": round(flow_packets_s, 4),
+            "fwd_iat_mean": round(fwd_iat_mean, 2),
+            "bwd_iat_mean": round(bwd_iat_mean, 2),
+            "fwd_psh_flags": fwd_psh_flags,
+            "syn_count": syn_count,
+            "rst_count": rst_count,
+            "ack_count": ack_count,
+            "psh_count": psh_count,
+            "active_mean": round(active_mean, 2),
+            "idle_mean": round(idle_mean, 2),
+            "flow_iat_mean": round(flow_iat_mean, 2),
+            "fwd_len_mean": round(fwd_len_mean, 2),
+            "bwd_len_mean": round(bwd_len_mean, 2),
+            "_is_attack": is_attack
+        }
+
+    def gen_session_nslkdd(idx):
+        """Genere une session basee sur les statistiques NSL-KDD."""
         import random
         normal = random.random() > 0.42
         protocols = ["tcp", "udp", "icmp"]
@@ -263,15 +427,19 @@ elif page == "2. Simulation RT":
             "_is_attack": not normal
         }
 
+    def gen_session(idx):
+        if active_dataset == "cicids2017":
+            return gen_session_cicids2017(idx)
+        return gen_session_nslkdd(idx)
+
     def predict_session(session):
         try:
             import explain
-            pred, conf, factors = explain.explain_prediction(session)
+            pred, conf, factors = explain.explain_prediction(session, dataset=active_dataset)
             return pred, conf, factors
-        except:
+        except Exception as e:
             return "unknown", 0.5, []
 
-    # Start / Stop buttons
     col_start, col_stop = st.columns(2)
     if col_start.button("▶ Lancer la simulation", type="primary", width='stretch'):
         st.session_state.sim_running = True
@@ -283,13 +451,11 @@ elif page == "2. Simulation RT":
     if col_stop.button("■ Arreter", width='stretch'):
         st.session_state.sim_running = False
 
-    # Stats
     if st.session_state.sim_running:
         counter_placeholder.metric("Sessions analysees", st.session_state.sim_counter)
         rate_placeholder.metric("Attaques detectees", st.session_state.sim_attacks,
                                 delta=f"{st.session_state.sim_attacks/st.max(st.session_state.sim_counter,1)*100:.1f}%")
 
-        # Auto-refresh toutes les secondes
         import time
         session = gen_session(st.session_state.sim_counter + 1)
         pred, conf, factors = predict_session(session)
@@ -300,131 +466,198 @@ elif page == "2. Simulation RT":
 
         is_attack = pred == "ATTACK" or session["_is_attack"]
         badge = "🔴 ATTAQUE" if is_attack else "🟢 Normal"
-        badge_color = "attack" if is_attack else "normal"
+
+        st.session_state.sim_history.insert(0, {
+            "id": session["session_id"],
+            "src": session["src_ip"],
+            "proto": session["protocol"],
+            "dur": f"{session.get('duration', session.get('fwd_packets', 0))}s",
+            "badge": badge,
+            "conf": f"{conf*100:.1f}%" if pred != "unknown" else "N/A",
+            "pred": pred
+        })
 
         with feed_placeholder.container():
-            # Prepend new session
-            st.session_state.sim_history.insert(0, {
-                "id": session["session_id"],
-                "src": session["src_ip"],
-                "dst": session["dst_ip"],
-                "proto": session["protocol"],
-                "bytes": f"{session['src_bytes']}/{session['dst_bytes']}",
-                "dur": f"{session['duration']}s",
-                "badge": badge,
-                "badge_color": badge_color,
-                "conf": f"{conf*100:.1f}%" if pred != "unknown" else "N/A",
-                "pred": pred
-            })
             rows = st.session_state.sim_history[:20]
             df = pd.DataFrame(rows)
             st.dataframe(
-                df[["id", "src", "proto", "bytes", "dur", "badge", "conf"]],
+                df[["id", "src", "proto", "dur", "badge", "conf"]],
                 width='stretch', hide_index=True,
-                column_config={
-                    "badge": st.column_config.TextColumn("Statut"),
-                    "conf": st.column_config.TextColumn("Confiance"),
-                }
+                column_config={"badge": st.column_config.TextColumn("Statut"),
+                               "conf": st.column_config.TextColumn("Confiance")}
             )
 
         time.sleep(0.8)
         st.rerun()
-
     else:
         if st.session_state.sim_counter > 0:
             st.success(f"Simulation terminee : {st.session_state.sim_counter} sessions, {st.session_state.sim_attacks} attaques detectees.")
         else:
             st.info("Appuyez sur 'Lancer la simulation' pour commencer.")
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 3 — Tester une session
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "3. Tester une session":
     st.title("Tester une Session Manuellement")
+    st.caption(f"Dataset actif: {selected_dataset_label}")
+
+    try:
+        model, preprocessor, label_encoders = load_model_and_preprocessor(active_dataset)
+    except Exception as e:
+        st.error(f"Impossible de charger le modele {active_dataset}: {e}")
+        st.stop()
 
     col1, col2 = st.columns([1, 1])
-    with col1:
-        st.subheader("Parametres de la session")
-        with st.form("session_form"):
-            src_ip = st.text_input("IP Source", "192.168.1.105")
-            dst_ip = st.text_input("IP Destination", "10.0.0.1")
-            src_port = st.number_input("Port Source", 1024, 65535, 54321)
-            dst_port = st.number_input("Port Destination", 1, 65535, 80)
-            protocol = st.selectbox("Protocol", ["tcp", "udp", "icmp"])
-            duration = st.number_input("Duree (s)", 0.0, 10000.0, 5.0)
-            src_bytes = st.number_input("Bytes envoyes", 0, 100000000, 5000)
-            dst_bytes = st.number_input("Bytes recus", 0, 100000000, 2000)
-            serror_rate = st.slider("Taux SERR", 0.0, 1.0, 0.05)
-            logged_in = st.selectbox("Logged in", [0, 1])
-            count = st.slider("Count (conn host)", 0, 255, 10)
-            srv_count = st.slider("Srv Count", 0, 255, 10)
-            rerror_rate = st.slider("Taux RERR", 0.0, 1.0, 0.02)
-            service = st.selectbox("Service", ["http", "ftp", "smtp", "dns", "ssh", "irc", "telnet", "pop3", "other"])
-            flag = st.selectbox("Flag", ["SF", "S0", "S1", "S2", "S3", "REJ", "RSTO", "RSTR", "SH", "SHR"])
-            hot = st.slider("Hot (anomalies)", 0, 10, 0)
-            wrong_fragment = st.slider("Fragments corrompus", 0, 3, 0)
-            urgent = st.slider("Paquets urgents", 0, 5, 0)
-            num_compromised = st.slider("Hotes compromis", 0, 10, 0)
-            diff_srv_rate = st.slider("Taux diff srv", 0.0, 1.0, 0.05)
-            dst_host_count = st.slider("Dst host count", 0, 255, 50)
 
-            submitted = st.form_submit_button("🔍 Analyser", width='stretch')
+    if active_dataset == "cicids2017":
+        with col1:
+            st.subheader("Parametres de la session (CICIDS2017)")
+            with st.form("session_form"):
+                src_ip = st.text_input("IP Source", "192.168.1.105")
+                dst_ip = st.text_input("IP Destination", "10.0.0.1")
+                src_port = st.number_input("Port Source", 1024, 65535, 54321)
+                dst_port = st.number_input("Port Destination", 1, 65535, 80)
+                protocol = st.selectbox("Protocol", ["tcp", "udp", "icmp"])
+                duration = st.number_input("Flow Duration (s)", 0.0, 10000.0, 5.0)
+                fwd_packets = st.number_input("Total Fwd Packets", 1, 10000, 8)
+                bwd_packets = st.number_input("Total Bwd Packets", 0, 10000, 6)
+                fwd_len = st.number_input("Total Fwd Packet Length", 0, 10000000, 5000)
+                bwd_len = st.number_input("Total Bwd Packet Length", 0, 10000000, 3000)
+                flow_bytes_s = st.number_input("Flow Bytes/s", 0.0, 1e10, 1e6)
+                flow_packets_s = st.number_input("Flow Packets/s", 0.0, 1e6, 100.0)
+                fwd_iat_mean = st.number_input("Fwd IAT Mean (s)", 0.0, 1e6, 0.5)
+                bwd_iat_mean = st.number_input("Bwd IAT Mean (s)", 0.0, 1e6, 0.5)
+                fwd_psh_flags = st.number_input("Fwd PSH Flags", 0, 100, 1)
+                syn_count = st.number_input("SYN Flag Count", 0, 1000, 2)
+                rst_count = st.number_input("RST Flag Count", 0, 100, 0)
+                ack_count = st.number_input("ACK Flag Count", 0, 1000, 5)
+                psh_count = st.number_input("PSH Flag Count", 0, 100, 1)
+                active_mean = st.number_input("Active Mean (s)", 0.0, 1e6, 0.3)
+                idle_mean = st.number_input("Idle Mean (s)", 0.0, 1e6, 0.5)
+                flow_iat_mean = st.number_input("Flow IAT Mean (s)", 0.0, 1e6, 0.5)
+                fwd_len_mean = st.number_input("Fwd Packet Length Mean", 0.0, 1e6, 500.0)
+                bwd_len_mean = st.number_input("Bwd Packet Length Mean", 0.0, 1e6, 500.0)
+                submitted = st.form_submit_button("🔍 Analyser", width='stretch')
 
-    if submitted:
-        session = {
-            "duration": duration, "protocol_type": protocol,
-            "src_bytes": src_bytes, "dst_bytes": dst_bytes,
-            "land": 1 if src_ip == dst_ip else 0,
-            "wrong_fragment": wrong_fragment, "urgent": urgent,
-            "hot": hot, "logged_in": logged_in,
-            "num_compromised": num_compromised,
-            "count": count, "srv_count": srv_count,
-            "serror_rate": serror_rate, "srv_serror_rate": serror_rate,
-            "rerror_rate": rerror_rate, "srv_rerror_rate": rerror_rate,
-            "diff_srv_rate": diff_srv_rate,
-            "dst_host_count": dst_host_count,
-            "service": service, "flag": flag
-        }
-        try:
-            import explain
-            pred, conf, factors = explain.explain_prediction(session)
-        except Exception as e:
-            st.error(f"Erreur: {e}")
-            pred, conf, factors = "unknown", 0.5, []
+        if submitted:
+            session = {
+                "duration": duration, "fwd_packets": fwd_packets, "bwd_packets": bwd_packets,
+                "fwd_len": fwd_len, "bwd_len": bwd_len,
+                "flow_bytes_s": flow_bytes_s, "flow_packets_s": flow_packets_s,
+                "fwd_iat_mean": fwd_iat_mean, "bwd_iat_mean": bwd_iat_mean,
+                "fwd_psh_flags": fwd_psh_flags, "syn_count": syn_count,
+                "rst_count": rst_count, "ack_count": ack_count, "psh_count": psh_count,
+                "active_mean": active_mean, "idle_mean": idle_mean,
+                "flow_iat_mean": flow_iat_mean,
+                "fwd_len_mean": fwd_len_mean, "bwd_len_mean": bwd_len_mean,
+                "dst_port": dst_port,
+            }
+            try:
+                import explain
+                pred, conf, factors = explain.explain_prediction(session, dataset=active_dataset)
+            except Exception as e:
+                st.error(f"Erreur: {e}")
+                pred, conf, factors = "unknown", 0.5, []
 
-        with col2:
-            st.subheader("Resultat")
-            if pred == "ATTACK":
-                st.error(f"🔴 ALERTE — Attaque detectee (confiance: {conf*100:.1f}%)")
-            elif pred == "NORMAL":
-                st.success(f"🟢 Session normale (confiance: {conf*100:.1f}%)")
-            else:
-                st.warning(f"⚠ Indetermine (confiance: {conf*100:.1f}%)")
-
-            if factors:
-                st.subheader("Facteurs explicatifs")
-                for f in factors[:5]:
-                    sens = "⬆" if f.get("sens") == "augmente" else "⬇"
-                    st.write(f"  {sens} **{f['feature']}** : {f['contribution']:+.3f}")
-
-                st.subheader("Interpretation")
+            with col2:
+                st.subheader("Resultat")
                 if pred == "ATTACK":
-                    alert_factors = [f for f in factors if f.get("sens") == "augmente"]
-                    if alert_factors:
-                        feats = ", ".join([f["feature"] for f in alert_factors[:3]])
-                        st.write(f"Cette session presente des anomalies sur : {feats}")
+                    st.error(f"🔴 ALERTE — Attaque detectee (confiance: {conf*100:.1f}%)")
+                elif pred == "NORMAL":
+                    st.success(f"🟢 Session normale (confiance: {conf*100:.1f}%)")
                 else:
-                    st.write("Aucun facteur d'attaque significatif detecte.")
+                    st.warning(f"⚠ Indetermine (confiance: {conf*100:.1f}%)")
+                if factors:
+                    st.subheader("Facteurs explicatifs")
+                    for f in factors[:5]:
+                        sens = "⬆" if f.get("sens") == "augmente" else "⬇"
+                        st.write(f"  {sens} **{f['feature']}** : {f['contribution']:+.3f}")
+
+    else:
+        # NSL-KDD form
+        with col1:
+            st.subheader("Parametres de la session (NSL-KDD)")
+            with st.form("session_form"):
+                src_ip = st.text_input("IP Source", "192.168.1.105")
+                dst_ip = st.text_input("IP Destination", "10.0.0.1")
+                src_port = st.number_input("Port Source", 1024, 65535, 54321)
+                dst_port = st.number_input("Port Destination", 1, 65535, 80)
+                protocol = st.selectbox("Protocol", ["tcp", "udp", "icmp"])
+                duration = st.number_input("Duree (s)", 0.0, 10000.0, 5.0)
+                src_bytes = st.number_input("Bytes envoyes", 0, 100000000, 5000)
+                dst_bytes = st.number_input("Bytes recus", 0, 100000000, 2000)
+                serror_rate = st.slider("Taux SERR", 0.0, 1.0, 0.05)
+                logged_in = st.selectbox("Logged in", [0, 1])
+                count = st.slider("Count (conn host)", 0, 255, 10)
+                srv_count = st.slider("Srv Count", 0, 255, 10)
+                rerror_rate = st.slider("Taux RERR", 0.0, 1.0, 0.02)
+                service = st.selectbox("Service", ["http", "ftp", "smtp", "dns", "ssh", "irc", "telnet", "pop3", "other"])
+                flag = st.selectbox("Flag", ["SF", "S0", "S1", "S2", "S3", "REJ", "RSTO", "RSTR", "SH", "SHR"])
+                hot = st.slider("Hot (anomalies)", 0, 10, 0)
+                wrong_fragment = st.slider("Fragments corrompus", 0, 3, 0)
+                urgent = st.slider("Paquets urgents", 0, 5, 0)
+                num_compromised = st.slider("Hotes compromis", 0, 10, 0)
+                diff_srv_rate = st.slider("Taux diff srv", 0.0, 1.0, 0.05)
+                dst_host_count = st.slider("Dst host count", 0, 255, 50)
+                submitted = st.form_submit_button("🔍 Analyser", width='stretch')
+
+        if submitted:
+            session = {
+                "duration": duration, "protocol_type": protocol,
+                "src_bytes": src_bytes, "dst_bytes": dst_bytes,
+                "land": 1 if src_ip == dst_ip else 0,
+                "wrong_fragment": wrong_fragment, "urgent": urgent,
+                "hot": hot, "logged_in": logged_in,
+                "num_compromised": num_compromised,
+                "count": count, "srv_count": srv_count,
+                "serror_rate": serror_rate, "srv_serror_rate": serror_rate,
+                "rerror_rate": rerror_rate, "srv_rerror_rate": rerror_rate,
+                "diff_srv_rate": diff_srv_rate,
+                "dst_host_count": dst_host_count,
+                "service": service, "flag": flag
+            }
+            try:
+                import explain
+                pred, conf, factors = explain.explain_prediction(session, dataset=active_dataset)
+            except Exception as e:
+                st.error(f"Erreur: {e}")
+                pred, conf,                pred, conf, factors = "unknown", 0.5, []
+
+            with col2:
+                st.subheader("Resultat")
+                if pred == "ATTACK":
+                    st.error(f"🔴 ALERTE — Attaque detectee (confiance: {conf*100:.1f}%)")
+                elif pred == "NORMAL":
+                    st.success(f"🟢 Session normale (confiance: {conf*100:.1f}%)")
+                else:
+                    st.warning(f"⚠ Indetermine (confiance: {conf*100:.1f}%)")
+
+                if factors:
+                    st.subheader("Facteurs explicatifs")
+                    for f in factors[:5]:
+                        sens = "⬆" if f.get("sens") == "augmente" else "⬇"
+                        st.write(f"  {sens} **{f['feature']}** : {f['contribution']:+.3f}")
+
+                    st.subheader("Interpretation")
+                    if pred == "ATTACK":
+                        alert_factors = [f for f in factors if f.get("sens") == "augmente"]
+                        if alert_factors:
+                            feats = ", ".join([f["feature"] for f in alert_factors[:3]])
+                            st.write(f"Cette session presente des anomalies sur : {feats}")
+                    else:
+                        st.write("Aucun facteur d'attaque significatif detecte.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 4 — Live Stream
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "4. Live Stream":
     st.title("Live Stream — Capture Reseau")
-    st.caption("Connexion a un reseau reel via Scapy, socket TCP ou fichier PCAP")
+    st.caption(f"Dataset actif: {selected_dataset_label}")
     st.info("📡 Mode actuel : simulation. Pour le mode reel, lancez live_stream.py sur le serveur et renseez les params ci-dessous.")
 
-    # Params
     col_m, col_p = st.columns(2)
     with col_m:
         mode = st.selectbox("Mode de capture", ["socket", "pcap", "sniff", "simulation"])
@@ -434,7 +667,6 @@ elif page == "4. Live Stream":
     seuil = st.slider("Seuil d'alerte (score)", 0.0, 1.0, 0.5, 0.05)
     max_sessions = st.number_input("Nombre de sessions max", 10, 1000, 100)
 
-    # Status
     if "live_running" not in st.session_state:
         st.session_state.live_running = False
     if "live_sessions" not in st.session_state:
@@ -454,7 +686,6 @@ elif page == "4. Live Stream":
     stats_col1, stats_col2 = st.columns(2)
     sc1 = stats_col1.empty()
     sc2 = stats_col2.empty()
-
     alert_feed = st.empty()
 
     if st.session_state.live_running:
@@ -462,39 +693,41 @@ elif page == "4. Live Stream":
         sc1.metric("Sessions capturees", len(st.session_state.live_sessions))
         sc2.metric("Alertes", st.session_state.live_alerts)
 
-        # Simulation de sessions en temps reel
         def live_gen():
-            protocols = ["tcp", "udp", "icmp"]
-            services = ["http", "ftp", "smtp", "dns", "ssh"]
-            return {
-                "session_id": f"LIVE-{len(st.session_state.live_sessions)+1:05d}",
-                "src_ip": f"192.168.{random.randint(1,254)}.{random.randint(1,254)}",
-                "dst_ip": f"10.0.{random.randint(1,254)}.{random.randint(1,254)}",
-                "src_port": random.randint(1024, 65535),
-                "dst_port": random.choice([80, 443, 22, 21, 53]),
-                "protocol": random.choice(protocols),
-                "duration": round(random.uniform(0.1, 100), 2),
-                "src_bytes": int(random.lognormvariate(8, 3)),
-                "dst_bytes": int(random.lognormvariate(10, 2)),
-                "serror_rate": round(min(random.expovariate(2), 1), 3),
-                "logged_in": random.randint(0, 1),
-                "count": random.randint(0, 100),
-                "srv_count": random.randint(0, 100),
-                "rerror_rate": round(min(random.expovariate(3), 1), 3),
-                "service": random.choice(services),
-                "flag": random.choice(["SF", "S0", "REJ", "RSTR"]),
-                "wrong_fragment": random.randint(0, 3),
-                "urgent": random.randint(0, 2),
-                "hot": random.randint(0, 10),
-                "num_compromised": random.randint(0, 8),
-                "diff_srv_rate": round(min(random.expovariate(3), 1), 3),
-                "dst_host_count": random.randint(0, 255),
-            }
+            if active_dataset == "cicids2017":
+                return gen_session_cicids2017(len(st.session_state.live_sessions))
+            else:
+                protocols = ["tcp", "udp", "icmp"]
+                services = ["http", "ftp", "smtp", "dns", "ssh"]
+                return {
+                    "session_id": f"LIVE-{len(st.session_state.live_sessions)+1:05d}",
+                    "src_ip": f"192.168.{random.randint(1,254)}.{random.randint(1,254)}",
+                    "dst_ip": f"10.0.{random.randint(1,254)}.{random.randint(1,254)}",
+                    "src_port": random.randint(1024, 65535),
+                    "dst_port": random.choice([80, 443, 22, 21, 53]),
+                    "protocol": random.choice(protocols),
+                    "duration": round(random.uniform(0.1, 100), 2),
+                    "src_bytes": int(random.lognormvariate(8, 3)),
+                    "dst_bytes": int(random.lognormvariate(10, 2)),
+                    "serror_rate": round(min(random.expovariate(2), 1), 3),
+                    "logged_in": random.randint(0, 1),
+                    "count": random.randint(0, 100),
+                    "srv_count": random.randint(0, 100),
+                    "rerror_rate": round(min(random.expovariate(3), 1), 3),
+                    "service": random.choice(services),
+                    "flag": random.choice(["SF", "S0", "REJ", "RSTR"]),
+                    "wrong_fragment": random.randint(0, 3),
+                    "urgent": random.randint(0, 2),
+                    "hot": random.randint(0, 10),
+                    "num_compromised": random.randint(0, 8),
+                    "diff_srv_rate": round(min(random.expovariate(3), 1), 3),
+                    "dst_host_count": random.randint(0, 255),
+                }
 
         session = live_gen()
         try:
             import explain
-            pred, conf, _ = explain.explain_prediction(session)
+            pred, conf, _ = explain.explain_prediction(session, dataset=active_dataset)
         except:
             pred, conf = "NORMAL", 0.5
 
@@ -505,20 +738,19 @@ elif page == "4. Live Stream":
         if len(st.session_state.live_sessions) > max_sessions:
             st.session_state.live_sessions = st.session_state.live_sessions[-max_sessions:]
 
-        # Affichage
         recent = st.session_state.live_sessions[-20:]
         rows = []
         for s in reversed(recent):
             try:
-                p, c, _ = explain.explain_prediction(s)
+                p, c, _ = explain.explain_prediction(s, dataset=active_dataset)
             except:
                 p, c = "NORMAL", 0.5
             is_a = (p == "ATTACK" and c >= seuil)
             rows.append({
-                "session_id": s["session_id"],
+                "session_id": s.get("session_id", "?"),
                 "src_ip": s["src_ip"],
-                "protocol": s["protocol"],
-                "bytes": f"{s['src_bytes']}/{s['dst_bytes']}",
+                "protocol": s.get("protocol", "?"),
+                "bytes": f"{s.get('src_bytes', s.get('fwd_len', 0))}/{s.get('dst_bytes', s.get('bwd_len', 0))}",
                 "statut": "🔴 ALERTE" if is_a else "🟢 Normal",
                 "conf": f"{c*100:.1f}%"
             })
@@ -529,7 +761,6 @@ elif page == "4. Live Stream":
 
         time.sleep(0.5)
         st.rerun()
-
     else:
         if st.session_state.live_sessions:
             sc1.metric("Sessions capturees", len(st.session_state.live_sessions))
