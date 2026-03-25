@@ -1,6 +1,6 @@
 # Systeme de Detection d'Intrusion par Apprentissage Automatique
 
-**Projet academique — Master SSI / Cybersecurite**
+**Projet academique  -  Master SSI / Cybersecurite**
 
 **Auteur** : UtmostMaker
 **Repository** : [github.com/UtmostMaker/cyber-ids-streamlit](https://github.com/UtmostMaker/cyber-ids-streamlit)
@@ -297,26 +297,26 @@ Characterization. ICISSP 2018.
 Pour ce projet, 20 features representatives ont ete selectionnees parmi
 les 80 disponibles, en se concentrant sur les metriques les plus discriminantes:
 
-1. `duration` — Duree totale du flux (secondes)
-2. `fwd_packets` — Nombre de paquets vers l'avant
-3. `bwd_packets` — Nombre de paquets vers l'arriere
-4. `fwd_len` — Volume total des paquets vers l'avant (bytes)
-5. `bwd_len` — Volume total des paquets vers l'arriere (bytes)
-6. `flow_bytes_s` — Debit moyen (bytes/s)
-7. `flow_packets_s` — Paquets par seconde
-8. `fwd_iat_mean` — Inter-Arival Time moyen (forward)
-9. `bwd_iat_mean` — Inter-Arival Time moyen (backward)
-10. `fwd_psh_flags` — Nombre de flags PSH (forward)
-11. `syn_count` — Nombre de flags SYN
-12. `rst_count` — Nombre de flags RST
-13. `ack_count` — Nombre de flags ACK
-14. `psh_count` — Nombre de flags PSH
-15. `active_mean` — Duree active moyenne
-16. `idle_mean` — Duree d'inactivite moyenne
-17. `flow_iat_mean` — IAT moyen sur le flux complet
-18. `fwd_len_mean` — Taille moyenne des paquets forward
-19. `bwd_len_mean` — Taille moyenne des paquets backward
-20. `dst_port` — Port destination
+1. `duration`  -  Duree totale du flux (secondes)
+2. `fwd_packets`  -  Nombre de paquets vers l'avant
+3. `bwd_packets`  -  Nombre de paquets vers l'arriere
+4. `fwd_len`  -  Volume total des paquets vers l'avant (bytes)
+5. `bwd_len`  -  Volume total des paquets vers l'arriere (bytes)
+6. `flow_bytes_s`  -  Debit moyen (bytes/s)
+7. `flow_packets_s`  -  Paquets par seconde
+8. `fwd_iat_mean`  -  Inter-Arival Time moyen (forward)
+9. `bwd_iat_mean`  -  Inter-Arival Time moyen (backward)
+10. `fwd_psh_flags`  -  Nombre de flags PSH (forward)
+11. `syn_count`  -  Nombre de flags SYN
+12. `rst_count`  -  Nombre de flags RST
+13. `ack_count`  -  Nombre de flags ACK
+14. `psh_count`  -  Nombre de flags PSH
+15. `active_mean`  -  Duree active moyenne
+16. `idle_mean`  -  Duree d'inactivite moyenne
+17. `flow_iat_mean`  -  IAT moyen sur le flux complet
+18. `fwd_len_mean`  -  Taille moyenne des paquets forward
+19. `bwd_len_mean`  -  Taille moyenne des paquets backward
+20. `dst_port`  -  Port destination
 
 #### Distribution des classes
 
@@ -423,14 +423,14 @@ Causes possibles:
 
 Les variables les plus discriminantes pour la classification sur CICIDS2017
 sont generalement:
-1. `flow_bytes_s` — Le debit est le premier discriminant
-2. `duration` — La duree du flux distingue les sessions courtes (scans)
+1. `flow_bytes_s`  -  Le debit est le premier discriminant
+2. `duration`  -  La duree du flux distingue les sessions courtes (scans)
    des sessions longues (telechargements)
-3. `fwd_packets` / `bwd_packets` — Le nombre de paquets asymetrique
+3. `fwd_packets` / `bwd_packets`  -  Le nombre de paquets asymetrique
    signale un comportement anomal
-4. `syn_count` — Un nombre eleve de SYN sans ACK correspondant
+4. `syn_count`  -  Un nombre eleve de SYN sans ACK correspondant
    indique un SYN scan ou un SYN flood
-5. `rst_count` — Les resets repetitifs signalent un port scan ou
+5. `rst_count`  -  Les resets repetitifs signalent un port scan ou
    un brute force
 
 ### 5.4 Comparaison avec la litterature

@@ -112,7 +112,7 @@ active_dataset = dict(available_datasets).get(selected_dataset_label, "nslkdd")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 1 — Modeles
+# PAGE 1  -  Modeles
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "1. Modeles":
     st.title("Comparaison des Modeles")
@@ -268,7 +268,7 @@ if page == "1. Modeles":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 2 — Simulation RT
+# PAGE 2  -  Simulation RT
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "2. Simulation RT":
     st.title("Simulation Temps Reel")
@@ -497,7 +497,7 @@ elif page == "2. Simulation RT":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — Tester une session
+# PAGE 3  -  Tester une session
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "3. Tester une session":
     st.title("Tester une Session Manuellement")
@@ -564,7 +564,7 @@ elif page == "3. Tester une session":
             with col2:
                 st.subheader("Resultat")
                 if pred == "ATTACK":
-                    st.error(f"🔴 ALERTE — Attaque detectee (confiance: {conf*100:.1f}%)")
+                    st.error(f"🔴 ALERTE  -  Attaque detectee (confiance: {conf*100:.1f}%)")
                 elif pred == "NORMAL":
                     st.success(f"🟢 Session normale (confiance: {conf*100:.1f}%)")
                 else:
@@ -628,7 +628,7 @@ elif page == "3. Tester une session":
             with col2:
                 st.subheader("Resultat")
                 if pred == "ATTACK":
-                    st.error(f"🔴 ALERTE — Attaque detectee (confiance: {conf*100:.1f}%)")
+                    st.error(f"🔴 ALERTE  -  Attaque detectee (confiance: {conf*100:.1f}%)")
                 elif pred == "NORMAL":
                     st.success(f"🟢 Session normale (confiance: {conf*100:.1f}%)")
                 else:
@@ -651,10 +651,10 @@ elif page == "3. Tester une session":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 4 — Live Stream
+# PAGE 4  -  Live Stream
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "4. Live Stream":
-    st.title("Live Stream — Capture Reseau")
+    st.title("Live Stream  -  Capture Reseau")
     st.caption(f"Dataset actif: {selected_dataset_label}")
     st.info("📡 Mode actuel : simulation. Pour le mode reel, lancez live_stream.py sur le serveur et renseez les params ci-dessous.")
 
@@ -772,7 +772,7 @@ elif page == "4. Live Stream":
     st.subheader("Documentation reseau")
     with st.expander("Comment connecter un reseau reel"):
         st.markdown("""
-        ### Option 1 — Scapy (sniff direct)
+        ### Option 1  -  Scapy (sniff direct)
         ```bash
         # Lancer le sniff sur une interface (necessite root)
         sudo python3 -c "
@@ -781,13 +781,13 @@ elif page == "4. Live Stream":
         sniff(iface='eth0', prn=handle, count=100)
         "
         ```
-        ### Option 2 — Zeek
+        ### Option 2  -  Zeek
         ```
         # Ajouter a local.zeek:
         Log::default_writer = Log::WRITER_ASCII(Log::json_log);
         # Ou utiliser EVE-JSON de Suricata
         ```
-        ### Option 3 — Suricata (EVE-JSON)
+        ### Option 3  -  Suricata (EVE-JSON)
         ```
         # /etc/suricata/suricata.yaml
         outputs:

@@ -390,7 +390,7 @@ def evaluate_sessions(sessions, dataset="cicids2017"):
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
     print(f"\n{'='*60}")
-    print(f"Resume — {sessions[0]['attack_type'] if sessions else '?'}")
+    print(f"Resume  -  {sessions[0]['attack_type'] if sessions else '?'}")
     print(f"{'='*60}")
     print(f"  Total         : {total}")
     print(f"  Attaques reelles: {n_attacks}")
@@ -427,7 +427,7 @@ def stream_attacks(dataset="cicids2017", interval=1.0, duration=60):
     import explain
 
     print(f"\n{'='*60}")
-    print(f"MODE STREAMING — Dataset: {dataset} — Duree: {duration}s")
+    print(f"MODE STREAMING  -  Dataset: {dataset}  -  Duree: {duration}s")
     print(f"{'='*60}")
     print("Appuyez sur Ctrl+C pour arreter.\n")
 
