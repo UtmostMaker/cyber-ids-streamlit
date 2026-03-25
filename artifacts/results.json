@@ -1,8 +1,11 @@
 {
+  "dataset": "nslkdd",
   "random_forest": {
     "accuracy": 0.979,
     "f1": 0.9780564263322884,
     "auc_roc": 0.9970211986107941,
+    "precision": 0.9789610990721844,
+    "recall": 0.9789610990721844,
     "confusion_matrix": [
       [
         1022,
@@ -18,6 +21,8 @@
     "accuracy": 0.9845,
     "f1": 0.9838961038961039,
     "auc_roc": 0.9985914660770152,
+    "precision": 0.9844781724299797,
+    "recall": 0.9844781724299797,
     "confusion_matrix": [
       [
         1022,
