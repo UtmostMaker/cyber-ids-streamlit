@@ -1,0 +1,61 @@
+{
+  "n_samples": 3000,
+  "n_features": 20,
+  "feature_names": [
+    "duration",
+    "src_bytes",
+    "dst_bytes",
+    "land",
+    "wrong_fragment",
+    "urgent",
+    "hot",
+    "logged_in",
+    "num_compromised",
+    "count",
+    "srv_count",
+    "serror_rate",
+    "srv_serror_rate",
+    "rerror_rate",
+    "srv_rerror_rate",
+    "diff_srv_rate",
+    "dst_host_count",
+    "protocol_type",
+    "service",
+    "flag"
+  ],
+  "categorical_cols": [
+    "protocol_type",
+    "service",
+    "flag"
+  ],
+  "numerical_cols": [
+    "duration",
+    "src_bytes",
+    "dst_bytes",
+    "land",
+    "wrong_fragment",
+    "urgent",
+    "hot",
+    "logged_in",
+    "num_compromised",
+    "count",
+    "srv_count",
+    "serror_rate",
+    "srv_serror_rate",
+    "rerror_rate",
+    "srv_rerror_rate",
+    "diff_srv_rate",
+    "dst_host_count"
+  ],
+  "target": "label",
+  "target_classes": {
+    "0": "normal",
+    "1": "attaque"
+  },
+  "train_size": 2400,
+  "test_size": 600,
+  "class_distribution": {
+    "normal": 2250,
+    "attaque": 750
+  }
+}

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Streamlit
+.streamlit/
+
+# Modeles et donnees (ne pas pousser sur GitHub)
+models/*.pkl
+artifacts/*.pkl
+artifacts/*.csv
+data/*.csv
+
+# Logs
+logs/*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
